@@ -1,3 +1,5 @@
+//GainCalibration
+
 const int numSensors = 4;
 const int sensorPins[numSensors] = {34, 35, 32, 33}; 
 
@@ -14,11 +16,13 @@ void loop() {
   unsigned int signalMax[numSensors];
   unsigned int signalMin[numSensors];
 
+  // Set nilai awal
   for (int i = 0; i < numSensors; i++) {
     signalMax[i] = 0;
     signalMin[i] = 4095;
   }
 
+  // Sampling data selama 50ms
   while (millis() - startMillis < sampleWindow) {
     for (int i = 0; i < numSensors; i++) {
       unsigned int sample = analogRead(sensorPins[i]);
@@ -33,10 +37,11 @@ void loop() {
     }
   }
 
+  // Hitung Peak-to-Peak
   for (int i = 0; i < numSensors; i++) {
     unsigned int peakToPeak = signalMax[i] - signalMin[i];
     
-    Serial.print(peakToPeak); 
+    Serial.print(peakToPeak); // Print nilai mentah ADC
     
     if (i < numSensors - 1) {
       Serial.print("\t");
