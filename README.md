@@ -26,7 +26,7 @@ This prototype can be applied to:
 
 ### Limitations
 - Supports only a single dominant sound source.
-- Direction estimation accuracy is affected by environmental noise, reflections, atc.
+- Direction estimation accuracy is affected by environmental noise, reflections, etc.
 - Does not calculate the exact position of the sound source.
 - Designed as a prototype and proof-of-concept implementation.
 
