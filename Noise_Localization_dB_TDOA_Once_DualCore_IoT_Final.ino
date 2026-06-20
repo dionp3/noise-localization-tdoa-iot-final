@@ -15,7 +15,7 @@ const int sensorPins[numSensors] = {34, 35, 32, 33};
 
 const int sampleWindow = 50;
 const float dbThreshold = 55.0; 
-const float calibrationOffset = 79.0;
+const float calibrationOffset = 76; 
 
 const float rawSensorPoints[] = {43.60, 45.12, 46.86, 49.61, 55.79, 64.99}; 
 const float trueSLMPoints[]   = {45.0, 51.0, 55.5, 60.5, 71.0, 80.0};
@@ -26,29 +26,23 @@ float lockedAzimuth = -1;
 String lockedArah = "Tidak Diketahui";
 
 volatile bool newDataReady = false;
-
 volatile unsigned int sharedSignalMax[numSensors];
 volatile unsigned int sharedSignalMin[numSensors];
 volatile unsigned long sharedTimeArrivals[numSensors];
 
 TaskHandle_t TaskCore0Handle;
 
+void core0Task(void * pvParameters);
+float interpolateDB(float rawDB);
+String getDirectionLabel(float deg);
+void setup_wifi();
+void reconnectMQTT();
+
 void setup() {
   Serial.begin(115200);
-  
   setup_wifi();
   client.setServer(mqtt_server, 1883);
-
-  xTaskCreatePinnedToCore(
-    core0Task,          
-    "MQTT_Math_Task",   
-    10000,              
-    NULL,               
-    1,                  
-    &TaskCore0Handle,   
-    0                   
-  );
-
+  xTaskCreatePinnedToCore(core0Task, "MQTT_Math_Task", 10000, NULL, 1, &TaskCore0Handle, 0);
   Serial.println("Depan\tKiri\tBelakang\tKanan\tAVG\tStatus\tSudut\tArah");
 }
 
@@ -56,13 +50,11 @@ void loop() {
   unsigned int localSignalMax[numSensors] = {0, 0, 0, 0};
   unsigned int localSignalMin[numSensors] = {4095, 4095, 4095, 4095};
   unsigned long localTimeArrivals[numSensors] = {0, 0, 0, 0};
-
   unsigned long startMillis = millis();
 
   while (millis() - startMillis < sampleWindow) {
     for (int i = 0; i < numSensors; i++) {
       int sample = analogRead(sensorPins[i]);
-
       if (sample > localSignalMax[i]) {
         localSignalMax[i] = sample;
         localTimeArrivals[i] = micros(); 
@@ -91,7 +83,6 @@ void core0Task(void * pvParameters) {
     client.loop();
 
     if (newDataReady) {
-      
       float dbValues[numSensors];
       float totalDB = 0;
 
@@ -99,39 +90,29 @@ void core0Task(void * pvParameters) {
         int peakToPeak = sharedSignalMax[i] - sharedSignalMin[i];
         float volts = (peakToPeak * 3.3) / 4095.0;
         float vRms = volts * 0.3535;
-
         float rawDB = 0;
         if (vRms > 0.001) {
           rawDB = 20.0 * log10(vRms) + calibrationOffset;
         }
-
         dbValues[i] = interpolateDB(rawDB);
         if (dbValues[i] < 0) dbValues[i] = 0;
-        
         totalDB += dbValues[i];
       }
 
       float avgDB = totalDB / numSensors;
       String status = (avgDB >= dbThreshold) ? "Bising" : "Normal";
-
-      
-      float finalAzimuth = -1; 
+      float finalAzimuth = -1;
       String arah = "Tidak Diketahui";
 
       if (avgDB >= dbThreshold) {
         if (!isSoundLocked) {
           if (sharedTimeArrivals[0] > 0 && sharedTimeArrivals[1] > 0 && 
               sharedTimeArrivals[2] > 0 && sharedTimeArrivals[3] > 0) {
-
             long dY = (long)(sharedTimeArrivals[2] - sharedTimeArrivals[0]);
             long dX = (long)(sharedTimeArrivals[1] - sharedTimeArrivals[3]);
-
             finalAzimuth = atan2((float)dX, (float)dY) * 180.0 / PI;
-            
             if (finalAzimuth < 0) finalAzimuth += 360;
-            
             arah = getDirectionLabel(finalAzimuth);
-
             lockedAzimuth = finalAzimuth;
             lockedArah = arah;
             isSoundLocked = true; 
@@ -150,39 +131,31 @@ void core0Task(void * pvParameters) {
       newDataReady = false; 
 
       if (millis() - lastMQTTUpdate > 1000) {
-        
-        Serial.printf("%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%s\t", 
-                      dbValues[0], dbValues[1], dbValues[2], dbValues[3], avgDB, status.c_str());
-        
+        Serial.printf("%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%s\t", dbValues[0], dbValues[1], dbValues[2], dbValues[3], avgDB, status.c_str());
         if (finalAzimuth != -1) {
           Serial.printf("%.0f\t%s\n", finalAzimuth, arah.c_str());
         } else {
-          Serial.printf("-\t-\n"); 
+          Serial.printf("-\t-\n");
         }
 
         if (client.connected()) {
           char payload[256];
           snprintf(payload, sizeof(payload),
             "{\"depan\":%.1f,\"kiri\":%.1f,\"belakang\":%.1f,\"kanan\":%.1f,\"avg\":%.1f,\"status\":\"%s\",\"azimuth\":%.0f,\"arah\":\"%s\"}",
-            dbValues[0], dbValues[1], dbValues[2], dbValues[3],      
-            avgDB, status.c_str(), finalAzimuth, arah.c_str()
+            dbValues[0], dbValues[1], dbValues[2], dbValues[3], avgDB, status.c_str(), finalAzimuth, arah.c_str()
           );
           client.publish("v1/devices/me/telemetry", payload);
         }
-
         lastMQTTUpdate = millis();
       }
     }
-
     vTaskDelay(5 / portTICK_PERIOD_MS); 
   }
 }
 
-
 float interpolateDB(float rawDB) {
   if (rawDB <= rawSensorPoints[0]) return trueSLMPoints[0] - (rawSensorPoints[0] - rawDB);
   if (rawDB >= rawSensorPoints[numPoints - 1]) return trueSLMPoints[numPoints - 1] + (rawDB - rawSensorPoints[numPoints - 1]);
-
   for (int i = 0; i < numPoints - 1; i++) {
     if (rawDB >= rawSensorPoints[i] && rawDB <= rawSensorPoints[i+1]) {
       return trueSLMPoints[i] + ((rawDB - rawSensorPoints[i]) * (trueSLMPoints[i+1] - trueSLMPoints[i]) / (rawSensorPoints[i+1] - rawSensorPoints[i]));
