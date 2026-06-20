@@ -11,7 +11,7 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 const int numSensors = 4;
-const int sensorPins[numSensors] = {34, 35, 32, 33}; 
+const int sensorPins[numSensors] = {34, 35, 32, 33};
 
 const int sampleWindow = 50;
 const float dbThreshold = 55.0; 
@@ -97,12 +97,14 @@ void core0Task(void * pvParameters) {
       newDataReady = false; 
       if (millis() - lastMQTTUpdate > 1000) {
         Serial.printf("%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%s\t", dbValues[0], dbValues[1], dbValues[2], dbValues[3], avgDB, status.c_str());
-        Serial.printf("%lu\t%lu\t%lu\t%lu\t", sharedTimeArrivals[0], sharedTimeArrivals[1], sharedTimeArrivals[2], sharedTimeArrivals[3]);
-        if (finalAzimuth != -1) {
+        
+        if (avgDB >= dbThreshold) {
+          Serial.printf("%lu\t%lu\t%lu\t%lu\t", sharedTimeArrivals[0], sharedTimeArrivals[1], sharedTimeArrivals[2], sharedTimeArrivals[3]);
           Serial.printf("%.0f\t%s\n", finalAzimuth, arah.c_str());
         } else {
-          Serial.printf("-\t-\n");
+          Serial.printf("-\t-\t-\t-\t-\t-\n");
         }
+
         if (client.connected()) {
           char payload[256];
           snprintf(payload, sizeof(payload),
