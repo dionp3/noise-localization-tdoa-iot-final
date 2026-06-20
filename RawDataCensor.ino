@@ -1,5 +1,3 @@
-//RawDataCensor
-
 const int micPins[4] = {34, 35, 32, 33};
 
 void setup() {
