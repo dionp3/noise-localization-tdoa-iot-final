@@ -134,10 +134,8 @@ void loop() {
     }
   }
 
-  // Mencetak data waktu kedatangan mutlak individual masing-masing sensor
   Serial.printf("%lu\t%lu\t%lu\t%lu\t", t_depan, t_kiri, t_belakang, t_kanan);
   
-  // Mencetak selisih waktu hasil kalkulasi sumbu dX dan dY
   Serial.printf("%ld\t%ld\t", dX, dY);
   
   if (azimuth != -1.0) {
