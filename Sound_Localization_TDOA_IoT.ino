@@ -55,7 +55,7 @@ void setup() {
     delay(2);
   }
   THRESHOLD = (avgCenter / 200) + SENSITIVITY_OFFSET;
-  Serial.printf("\nSukses. Threshold: %d\n\nT_Depan(us)\tT_Kiri(us)\tT_Belakang(us)\tT_Kanan(us)\tAzimuth(°)\tArah\n", THRESHOLD);
+  Serial.printf("\nSukses. Threshold: %d\n\nT_Depan(us)\tT_Kiri(us)\tT_Belakang(us)\tT_Kanan(us)\tdX (us)\tdY (us)\tAzimuth(°)\tArah\n", THRESHOLD);
 }
 
 void loop() {
@@ -134,7 +134,12 @@ void loop() {
     }
   }
 
+  // Mencetak data waktu kedatangan mutlak individual masing-masing sensor
   Serial.printf("%lu\t%lu\t%lu\t%lu\t", t_depan, t_kiri, t_belakang, t_kanan);
+  
+  // Mencetak selisih waktu hasil kalkulasi sumbu dX dan dY
+  Serial.printf("%ld\t%ld\t", dX, dY);
+  
   if (azimuth != -1.0) {
     Serial.printf("%.1f\t%s\n", azimuth, arah_teks.c_str());
   } else {
